@@ -1,0 +1,1 @@
+@call run.bat bots\csharp\ExampleBot\MyBot.cs bots\demoBot4.pyc
