@@ -5,42 +5,73 @@ namespace Skillz
 {
     public class Bot : IPirateBot
     {
+        private const int MAX_SPEED = 6;
+
+        private const int COLLECT_SPEED = 3;
+
         private static int left;
+
+        private static Pirate chaser;
 
         private static List<Treasure> targets;
 
         private static void InitTurn()
         {
-            left = 6;
+            left = MAX_SPEED;
+            chaser = null;
             targets = new List<Treasure>();
         }
 
         public void DoTurn(IPirateGame game)
         {
             InitTurn();
-            foreach (var pirate in game.MyPiratesWithTreasures())
-            {
-                Return(game, pirate);
-            }
-            var targets = game.EnemyPiratesWithTreasures();
-            if (targets.Count > 0)
-            {
-                Goto(game, GetNearestPirate(game, targets[0]), targets[0].Location, 6);
-            }
+            Return(game);
+            Chase(game);
             foreach (var pirate in game.MyPiratesWithoutTreasures())
             {
-                Collect(game, pirate, 2);
+                if (pirate != chaser)
+                {
+                    Collect(game, pirate, COLLECT_SPEED);
+                }
             }
         }
 
-        private static void Return(IPirateGame game, Pirate pirate)
+        private static void Return(IPirateGame game)
         {
-            Goto(game, pirate, pirate.InitialLocation, 1);
+            foreach (var pirate in game.MyPiratesWithTreasures())
+            {
+                Goto(game, pirate, pirate.InitialLocation, pirate.CarryTreasureSpeed);
+            }
+        }
+
+        private static void Chase(IPirateGame game)
+        {
+            var targets = game.EnemyPiratesWithTreasures();
+            if (targets.Count > 0)
+            {
+                chaser = GetNearestPirate(game, targets[0]);
+                if (chaser == null)
+                {
+                    return;
+                }
+                Goto(game, chaser, targets[0].Location, MAX_SPEED);
+            }
+        }
+
+        private static void Collect(IPirateGame game, Pirate pirate, int moves)
+        {
+            Treasure treasure = GetNearestTreasure(game, pirate);
+            if (treasure == null)
+            {
+                return;
+            }
+            targets.Add(treasure);
+            Goto(game, pirate, treasure.Location, moves);
         }
 
         private static void Goto(IPirateGame game, Pirate pirate, Location destination, int moves)
         {
-            if (TryAttack(game, pirate))
+            if (pirate.TurnsToSober > 0 || TryDefend(game, pirate) || TryAttack(game, pirate))
             {
                 return;
             }
@@ -59,36 +90,6 @@ namespace Skillz
                 }
             }
         }
-
-        private static void Collect(IPirateGame game, Pirate pirate, int moves)
-        {
-            Treasure treasure = GetNearestTreasure(game, pirate);
-            if (treasure == null)
-            {
-                return;
-            }
-            targets.Add(treasure);
-            Goto(game, pirate, treasure.Location, moves);
-        }
-
-        /*private static T GetNearest<T>(IPirateGame game, Pirate pirate, List<T> list) where T : class
-        {
-            T nearest = null;
-            int minDist = 0;
-            foreach (var i in list)
-            {
-                Location location = (i as Pirate)?.Location ?? (i as Treasure)?.Location;
-                if (location == null)
-                    throw new ArgumentException();
-                int dist = game.Distance(pirate, location);
-                if (nearest == null || dist < minDist)
-                {
-                    nearest = i;
-                    minDist = dist;
-                }
-            }
-            return nearest;
-        }*/
 
         private static Treasure GetNearestTreasure(IPirateGame game, Pirate pirate)
         {
@@ -115,20 +116,21 @@ namespace Skillz
             int minDist = 0;
             foreach (var pirate in game.MySoberPirates())
             {
-                if (!pirate.HasTreasure)
+                if (pirate.HasTreasure || pirate.ReloadTurns > 0)
                 {
-                    int dist = game.Distance(enemy, pirate);
-                    if (nearest == null || dist < minDist)
-                    {
-                        nearest = pirate;
-                        minDist = dist;
-                    }
+                    continue;
+                }
+                int dist = game.Distance(enemy, pirate);
+                if (nearest == null || dist < minDist)
+                {
+                    nearest = pirate;
+                    minDist = dist;
                 }
             }
             return nearest;
         }
 
-        /*private static int GetSpace(IPirateGame game, Pirate pirate)
+        private static bool IsSafe(IPirateGame game, Pirate pirate)
         {
             int space = -1;
             foreach (var enemy in game.EnemySoberPirates())
@@ -143,30 +145,8 @@ namespace Skillz
                     space = dist;
                 }
             }
-            return space;
+            return space < 0 || space > pirate.AttackRadius;
         }
-
-        private static Pirate GetReturns(IPirateGame game)
-        {
-            var targets = game.EnemyPiratesWithTreasures();
-            Pirate target = null;
-            int minDist = 0;
-            foreach (var enemy in targets)
-            {
-                int dist = GetDistToReturn(game, enemy);
-                if (dist < minDist)
-                {
-                    target = enemy;
-                    minDist = dist;
-                }
-            }
-            return target;
-        }
-
-        private static int GetDistToReturn(IPirateGame game, Pirate pirate)
-        {
-            return game.Distance(pirate, pirate.InitialLocation);
-        }*/
 
         private static bool TryAttack(IPirateGame game, Pirate pirate)
         {
@@ -184,5 +164,37 @@ namespace Skillz
             }
             return false;
         }
+
+        private static bool TryDefend(IPirateGame game, Pirate pirate)
+        {
+            if (game.GetDefenseExpirationTurns() > 0 || game.GetDefenseReloadTurns() > 0 || IsSafe(game, pirate))
+            {
+                return false;
+            }
+            game.Defend(pirate);
+            return true;
+        }
+
+        /*private static Pirate GetNearestReturn(IPirateGame game)
+        {
+            var targets = game.EnemyPiratesWithTreasures();
+            Pirate target = null;
+            int minDist = 0;
+            foreach (var enemy in targets)
+            {
+                int dist = GetDistToReturn(game, enemy);
+                if (target == null || dist < minDist)
+                {
+                    target = enemy;
+                    minDist = dist;
+                }
+            }
+            return target;
+        }
+
+        private static int GetDistToReturn(IPirateGame game, Pirate pirate)
+        {
+            return game.Distance(pirate, pirate.InitialLocation);
+        }*/
     }
 }
