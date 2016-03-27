@@ -5,8 +5,6 @@ namespace Skillz
 {
     public class Bot : IPirateBot
     {
-        private const int MAX_SPEED = 6;
-
         private const int COLLECT_SPEED = 3;
 
         private static int left;
@@ -15,16 +13,16 @@ namespace Skillz
 
         private static List<Treasure> targets;
 
-        private static void InitTurn()
+        private static void InitTurn(IPirateGame game)
         {
-            left = MAX_SPEED;
+            left = game.GetActionsPerTurn();
             chaser = null;
             targets = new List<Treasure>();
         }
 
         public void DoTurn(IPirateGame game)
         {
-            InitTurn();
+            InitTurn(game);
             Return(game);
             Chase(game);
             foreach (var pirate in game.MyPiratesWithoutTreasures())
@@ -54,7 +52,7 @@ namespace Skillz
                 {
                     return;
                 }
-                Goto(game, chaser, targets[0].Location, MAX_SPEED);
+                Goto(game, chaser, targets[0].Location, left);
             }
         }
 
