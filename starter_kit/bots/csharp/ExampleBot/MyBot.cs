@@ -1,4 +1,4 @@
-﻿using Pirates;
+using Pirates;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -16,8 +16,25 @@ namespace Skillz
         {
             left = game.GetActionsPerTurn();
             chaser = null;
-            treasures = new List<Treasure>();
+            treasures = game.Treasures();
         }
+
+        //public Treasure HigestValue(List<Treasure> list)
+        //{
+        //    int Max = -1000;
+        //    Treasure find = list[0];
+
+        //    foreach (Treasure t in list)
+        //    {
+        //        if (t.Value > Max)
+        //        {
+        //            Max = t.Value;
+        //            find = t;
+        //        }
+        //    }
+        //    return find;
+        //}
+
 
         public void DoTurn(IPirateGame game)
         {
@@ -181,7 +198,7 @@ namespace Skillz
             {
                 if (enemy.HasTreasure || enemy.ReloadTurns > 0)
                 {
-                    continue;   
+                    continue;
                 }
                 int dist = game.Distance(pirate, enemy);
                 if (space < 0 || dist < space)
